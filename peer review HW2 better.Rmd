@@ -14,12 +14,10 @@ library(leaflet)
 library(shinyWidgets)
 library(data.table)
 
-# Read data
 data <- fread("https://raw.githubusercontent.com/Rui-kai/hw2/main/WorldsBestRestaurants.csv")
 
-# Helper Functions
 
-## Define color scheme for the restaurants based on rank
+## Define color for restaurants based on rank
 getColor <- function(rank) {
   if (rank <= 10) {
     return("#FFD700")  # Gold for Top 10
@@ -31,7 +29,7 @@ getColor <- function(rank) {
 ## Function to create leaflet map with restaurants
 createLeafletMap <- function(filtered_data) {
   
-  # Apply color scheme
+  # Applying colors
   filtered_data$color <- sapply(filtered_data$rank, getColor)
   
   # Generate the leaflet map
@@ -54,7 +52,7 @@ createLeafletMap <- function(filtered_data) {
     )
 }
 
-## Function to create the filtered table
+#table
 createFilteredTable <- function(filtered_data) {
   filtered_data %>%
     mutate(
@@ -67,21 +65,19 @@ createFilteredTable <- function(filtered_data) {
     select(Year, Rank, Restaurant, Location, Country) 
 }
 
-# UI
 ui <- fluidPage(
   theme = bs_theme(bootswatch = "lux"),  # Improved styling using the Lux theme from bslib
   
   titlePanel(
   HTML("<h2 style='
        text-align: center; 
-       font-size: 55px; 
+       font-size: 45px; 
        color: #151170; 
        font-weight: bold;'
        >World's Best Restaurants Interactive Map</h2>")
 ),
 br(),
 br(),
-  # Filters Layout
   fluidRow(
     column(4,
            card(
@@ -109,8 +105,6 @@ br(),
            )
     )
   ),
-  
-  # Main Content in Tabs
   tabsetPanel(
     tabPanel("Map View", leafletOutput("scatterPlot", height = 600)),
     tabPanel("Table View", tableOutput("filteredTable"))
@@ -120,18 +114,15 @@ br(),
   actionButton("help", "Help", icon = icon("info-circle"))
 )
 
-# Server
-server <- function(input, output) {
 
-  # Reactive filter for year and rank
+server <- function(input, output) {
   filteredDataSliders <- reactive({
     req(input$Year, input$Rank)
     data %>%
       filter(year %in% input$Year, 
              rank >= input$Rank[1], rank <= input$Rank[2])
   })
-  
-  # Reactive filter for location
+
   filteredDataLocation <- reactive({
     data_filtered <- filteredDataSliders()
     if (input$Location != "All") {
@@ -141,18 +132,16 @@ server <- function(input, output) {
     data_filtered
   })
   
-  # Render interactive map using the external function `createLeafletMap`
   output$scatterPlot <- renderLeaflet({
     filtered_data <- filteredDataLocation()
     createLeafletMap(filtered_data)
   })
   
-  # Render filtered table
   output$filteredTable <- renderTable({
     createFilteredTable(filteredDataLocation())
   })
   
-  # Help button popup
+  # Help button 
   observeEvent(input$help, {
     showModal(modalDialog(
       title = "How to Use This App",
@@ -166,6 +155,5 @@ server <- function(input, output) {
   })
 }
 
-# Run the application
 shinyApp(ui = ui, server = server)
 ```
