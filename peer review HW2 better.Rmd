@@ -1,0 +1,171 @@
+---
+title: "peer review hw2"
+output: html_document
+date: "2024-11-09"
+---
+
+```{r}
+library(shiny)
+library(ggplot2)
+library(dplyr)
+library(bslib)
+library(maps)
+library(leaflet)
+library(shinyWidgets)
+library(data.table)
+
+# Read data
+data <- fread("https://raw.githubusercontent.com/Rui-kai/hw2/main/WorldsBestRestaurants.csv")
+
+# Helper Functions
+
+## Define color scheme for the restaurants based on rank
+getColor <- function(rank) {
+  if (rank <= 10) {
+    return("#FFD700")  # Gold for Top 10
+  } else {
+    return("#1E90FF")  # Blue for Ranks 11-50
+  }
+}
+
+## Function to create leaflet map with restaurants
+createLeafletMap <- function(filtered_data) {
+  
+  # Apply color scheme
+  filtered_data$color <- sapply(filtered_data$rank, getColor)
+  
+  # Generate the leaflet map
+  leaflet(filtered_data) %>%
+    addTiles() %>%
+    addCircleMarkers(
+      ~lng, ~lat,
+      popup = ~paste0("<b>", restaurant, "</b><br>Rank: ", rank,
+                      "<br>Location: ", location),
+      radius = ~ifelse(rank <= 10, 8, 5),
+      color = ~color,
+      fillColor = ~color,
+      fillOpacity = 0.6
+    ) %>%
+    addLegend(
+      position = "bottomright",
+      colors = c("#FFD700", "#1E90FF"),
+      labels = c("Top 10 Ranked", "Rank 11-50"),
+      title = "Restaurant Rank"
+    )
+}
+
+## Function to create the filtered table
+createFilteredTable <- function(filtered_data) {
+  filtered_data %>%
+    mutate(
+      Year = year,
+      Rank = rank,
+      Restaurant = restaurant,
+      Location = location,
+      Country = country
+    ) %>%
+    select(Year, Rank, Restaurant, Location, Country) 
+}
+
+# UI
+ui <- fluidPage(
+  theme = bs_theme(bootswatch = "lux"),  # Improved styling using the Lux theme from bslib
+  
+  titlePanel(
+  HTML("<h2 style='
+       text-align: center; 
+       font-size: 55px; 
+       color: #151170; 
+       font-weight: bold;'
+       >World's Best Restaurants Interactive Map</h2>")
+),
+br(),
+br(),
+  # Filters Layout
+  fluidRow(
+    column(4,
+           card(
+             title = "Select Years",
+             pickerInput("Year", "Select Year(s):",
+                         choices = seq(2002, 2024),
+                         selected = c(2010, 2020),
+                         multiple = TRUE,
+                         options = list(`actions-box` = TRUE))
+           )
+    ),
+    column(4,
+           card(
+             title = "Rank Range",
+             sliderInput("Rank", "Select Rank Range:",
+                         min = 1, max = 50, value = c(1, 50))
+           )
+    ),
+    column(4,
+           card(
+             title = "Select Country",
+             selectInput("Location", "Filter by Country:",
+             choices = c("All", sort(unique(data$country))),
+             selected = "All")
+           )
+    )
+  ),
+  
+  # Main Content in Tabs
+  tabsetPanel(
+    tabPanel("Map View", leafletOutput("scatterPlot", height = 600)),
+    tabPanel("Table View", tableOutput("filteredTable"))
+  ),
+  
+  # Help Button
+  actionButton("help", "Help", icon = icon("info-circle"))
+)
+
+# Server
+server <- function(input, output) {
+
+  # Reactive filter for year and rank
+  filteredDataSliders <- reactive({
+    req(input$Year, input$Rank)
+    data %>%
+      filter(year %in% input$Year, 
+             rank >= input$Rank[1], rank <= input$Rank[2])
+  })
+  
+  # Reactive filter for location
+  filteredDataLocation <- reactive({
+    data_filtered <- filteredDataSliders()
+    if (input$Location != "All") {
+      data_filtered <- data_filtered %>%
+        filter(country == input$Location)
+    }
+    data_filtered
+  })
+  
+  # Render interactive map using the external function `createLeafletMap`
+  output$scatterPlot <- renderLeaflet({
+    filtered_data <- filteredDataLocation()
+    createLeafletMap(filtered_data)
+  })
+  
+  # Render filtered table
+  output$filteredTable <- renderTable({
+    createFilteredTable(filteredDataLocation())
+  })
+  
+  # Help button popup
+  observeEvent(input$help, {
+    showModal(modalDialog(
+      title = "How to Use This App",
+      p("Select the desired filters to explore information about the world's best restaurants."),
+      p("1. Use 'Select Years' to pick specific years."),
+      p("2. Use 'Rank Range' to filter restaurants based on ranking."),
+      p("3. Choose a country from 'Select Country' to filter by location."),
+      easyClose = TRUE,
+      footer = NULL
+    ))
+  })
+}
+
+# Run the application
+shinyApp(ui = ui, server = server)
+```

@@ -1,0 +1,154 @@
+---
+title: "Untitled"
+output: html_document
+date: "`r Sys.Date()`"
+--- 
+
+
+```{r}
+
+library(shiny)
+library(ggplot2)
+library(dplyr)
+library(bslib)
+library(maps)
+library(shinyWidgets)
+
+# Read data
+data <- read.csv("https://raw.githubusercontent.com/Rui-kai/hw2/main/WorldsBestRestaurants.csv")
+head(data)
+
+# Function to create the scatter plot
+createScatterPlot <- function(filtered_data) {
+  world_map <- map_data("world")
+  ggplot() +
+    geom_polygon(data = world_map, aes(x = long, y = lat, group = group), fill = "#D2B48C", color = "white") +
+    geom_point(data = filtered_data, aes(x = lng, y = lat, color = rank), alpha = 0.6) +
+    coord_quickmap() +
+    labs(title = "Best Restaurants In The World",
+         x = "Longitude",
+         y = "Latitude",
+         color = "Rank") +
+    theme(plot.title = element_text(size = 20, face = "bold", hjust = 0.5))
+}
+
+# Function to create the filtered table
+createFilteredTable <- function(filtered_data) {
+  filtered_data %>% 
+    mutate(
+      Year=year,
+      Rank=rank,
+      Restaurant=restaurant,
+      Location=location,
+      Country=country
+    ) %>%
+  select(Year, Rank, Restaurant, Location, Country) 
+}
+
+# UI
+ui <- fluidPage(
+  theme = bs_theme(version = 5),  # Apply Bootstrap 5 theme using bslib
+  
+  # Title panel
+  titlePanel("World's Best Restaurants Interactive Map"),
+  
+  # Sliders and Input Controls
+  fluidRow(
+    column(4, 
+          card(
+            title = "Select Years",
+            pickerInput("Year", "Select Year(s):",
+                     choices = seq(2002, 2023),
+                     selected = c(2015, 2023),
+                     multiple = TRUE,
+                     options = list(`actions-box` = TRUE))
+           )
+    ),
+    column(4,
+           card(
+             title = "Rank Range",
+             sliderInput("Rank", "Select Rank Range:",
+                         min = 1, max = 50, value = c(1, 50))
+           )
+    ),
+    column(4,
+           card(
+             title = "Search Location",
+             textInput("Location", "Search by location:", value = "")
+           )
+    )
+  ),
+  
+  # Scatter Plot and Filtered Data Table
+  fluidRow(
+    column(12,
+           card(
+             title = "Scatter Plot",
+             plotOutput("scatterPlot", brush = brushOpts(id = "plotBrush"))
+           )
+    )
+  ),
+  
+  # Filtered Data Information (One Table for both filter and brush)
+  fluidRow(
+    column(12,
+           card(
+             title = "Filtered Restaurants Information",
+             tableOutput("filteredTable")  # Single table to display both filtered and brushed data
+           )
+    )
+  )
+)
+
+server <- function(input, output) {
+  
+  # Filtered data based on sliders and location
+  filteredDataSliders <- reactive({
+    req(input$Year, input$Rank)
+    data %>%
+      filter(year %in% input$Year, 
+             rank >= input$Rank[1], rank <= input$Rank[2])
+  })
+  
+  # Filter data based on location input
+  filteredDataLocation <- reactive({
+    data_filtered <- filteredDataSliders()
+    if (input$Location != "") {
+      data_filtered <- data_filtered %>% 
+        filter(grepl(input$Location, paste(country, location), ignore.case = TRUE))
+    }
+    data_filtered
+  })
+  
+  # Combine filtered data and brushed data
+  filteredData <- reactive({
+    data_filtered <- filteredDataLocation()
+    brushedPoints <- brushedPoints(data_filtered, input$plotBrush, xvar = 'lng', yvar = 'lat')
+    
+    if (nrow(brushedPoints) > 0) {
+      return(brushedPoints)
+    }
+    
+    return(data_filtered)
+  })
+  
+  # Render the scatter plot using the external function
+  output$scatterPlot <- renderPlot({
+    if (nrow(filteredData()) > 0) {
+      createScatterPlot(filteredData())
+    }
+  })
+  
+  # Render the filtered table using the external function
+  output$filteredTable <- renderTable({
+    if (nrow(filteredData()) > 0) {
+      createFilteredTable(filteredData())
+    }
+  })
+}
+
+# Run the application
+shinyApp(ui = ui, server = server)
+
+```
+
