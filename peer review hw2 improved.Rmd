@@ -14,11 +14,10 @@ library(bslib)
 library(maps)
 library(shinyWidgets)
 
-# Read data
-data <- read.csv("https://raw.githubusercontent.com/Rui-kai/hw2/main/WorldsBestRestaurants.csv")
-head(data)
 
-# Function to create the scatter plot
+data <- read.csv("https://raw.githubusercontent.com/Rui-kai/hw2/main/WorldsBestRestaurants.csv")
+
+#scatter plot
 createScatterPlot <- function(filtered_data) {
   world_map <- map_data("world")
   ggplot() +
@@ -32,7 +31,7 @@ createScatterPlot <- function(filtered_data) {
     theme(plot.title = element_text(size = 20, face = "bold", hjust = 0.5))
 }
 
-# Function to create the filtered table
+#table
 createFilteredTable <- function(filtered_data) {
   filtered_data %>% 
     mutate(
@@ -47,12 +46,8 @@ createFilteredTable <- function(filtered_data) {
 
 # UI
 ui <- fluidPage(
-  theme = bs_theme(version = 5),  # Apply Bootstrap 5 theme using bslib
-  
-  # Title panel
+  theme = bs_theme(version = 5),  
   titlePanel("World's Best Restaurants Interactive Map"),
-  
-  # Sliders and Input Controls
   fluidRow(
     column(4, 
           card(
@@ -78,8 +73,7 @@ ui <- fluidPage(
            )
     )
   ),
-  
-  # Scatter Plot and Filtered Data Table
+
   fluidRow(
     column(12,
            card(
@@ -89,7 +83,6 @@ ui <- fluidPage(
     )
   ),
   
-  # Filtered Data Information (One Table for both filter and brush)
   fluidRow(
     column(12,
            card(
@@ -102,7 +95,6 @@ ui <- fluidPage(
 
 server <- function(input, output) {
   
-  # Filtered data based on sliders and location
   filteredDataSliders <- reactive({
     req(input$Year, input$Rank)
     data %>%
@@ -110,7 +102,6 @@ server <- function(input, output) {
              rank >= input$Rank[1], rank <= input$Rank[2])
   })
   
-  # Filter data based on location input
   filteredDataLocation <- reactive({
     data_filtered <- filteredDataSliders()
     if (input$Location != "") {
@@ -120,7 +111,6 @@ server <- function(input, output) {
     data_filtered
   })
   
-  # Combine filtered data and brushed data
   filteredData <- reactive({
     data_filtered <- filteredDataLocation()
     brushedPoints <- brushedPoints(data_filtered, input$plotBrush, xvar = 'lng', yvar = 'lat')
@@ -132,14 +122,12 @@ server <- function(input, output) {
     return(data_filtered)
   })
   
-  # Render the scatter plot using the external function
   output$scatterPlot <- renderPlot({
     if (nrow(filteredData()) > 0) {
       createScatterPlot(filteredData())
     }
   })
   
-  # Render the filtered table using the external function
   output$filteredTable <- renderTable({
     if (nrow(filteredData()) > 0) {
       createFilteredTable(filteredData())
@@ -147,7 +135,6 @@ server <- function(input, output) {
   })
 }
 
-# Run the application
 shinyApp(ui = ui, server = server)
 
 ```
